@@ -1,1 +1,6 @@
-node_modules\n.env\nartifacts\ncache\ntypechain-types\n.DS_Store
+node_modules/
+out/
+cache/
+.env
+broadcast/
+.DS_Store
