@@ -1,0 +1,8 @@
+[
+  "function humanGateThreshold() external view returns (uint256)",
+  "function minStakeRequired() external view returns (uint256)",
+  "function isPaused() external view returns (bool)",
+  "function isHuman(address account) external view returns (bool)",
+  "function isBlacklisted(address agent) external view returns (bool)",
+  "function requiresHumanGate(uint256 value) external view returns (bool)"
+]

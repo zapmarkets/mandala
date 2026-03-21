@@ -1,0 +1,14 @@
+[
+  "event AgentRegistered(address indexed agent, bytes32 erc8004Id)",
+  "event ReputationUpdated(address indexed agent, uint256 wins, uint256 disputes)",
+  "event StakeDeposited(address indexed agent, uint256 amount)",
+  "event StakeWithdrawn(address indexed agent, uint256 amount)",
+  "function register(bytes32 erc8004Id, string metadataURI) external",
+  "function isRegistered(address agent) external view returns (bool)",
+  "function isSuspended(address agent) external view returns (bool)",
+  "function getAgent(address agent) external view returns (tuple(address agentAddress, bytes32 erc8004Id, string metadataURI, uint256 totalTasks, uint256 wins, uint256 disputes, uint256 stakedBalance, bool suspended, uint256 registeredAt))",
+  "function recordWin(address agent) external",
+  "function recordDispute(address agent) external",
+  "function recordTaskParticipation(address agent) external",
+  "function grantTaskRole(address taskContract) external"
+]

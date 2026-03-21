@@ -1,0 +1,8 @@
+[
+  "event TaskDeployed(address indexed taskAddress, address indexed coordinator, address token, uint256 reward, uint256 deadline)",
+  "function deployTask(tuple(address verifier, address token, uint256 stakeRequired, uint256 deadline, uint256 disputeWindow, bytes32 criteriaHash, string criteriaURI, bool humanGateEnabled) params) external payable returns (address taskAddress)",
+  "function allTasks() external view returns (address[])",
+  "function tasksByCoordinator(address coordinator) external view returns (address[])",
+  "function taskCount() external view returns (uint256)",
+  "function protocolFeeBps() external view returns (uint256)"
+]

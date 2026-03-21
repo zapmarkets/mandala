@@ -1,0 +1,20 @@
+[
+  "event ProofSubmitted(address indexed agent, bytes32 proofHash, string evidenceURI)",
+  "event WinnerSelected(address indexed winner, bytes32 proofHash)",
+  "event TaskFinalized(address indexed winner, uint256 reward)",
+  "event TaskDisputed(address indexed disputant, address indexed against)",
+  "event DisputeResolved(address indexed human, address indexed winner)",
+  "event TaskCancelled(address indexed by)",
+  "event StakeReturned(address indexed agent, uint256 amount)",
+  "event StakeSlashed(address indexed agent, uint256 amount)",
+  "function initialize(tuple(address coordinator, address verifier, address agentRegistry, address policy, address token, uint256 reward, uint256 stakeRequired, uint256 deadline, uint256 disputeWindow, bytes32 criteriaHash, string criteriaURI, bool humanGateEnabled) p) external payable",
+  "function submitProof(bytes32 proofHash, string evidenceURI) external payable",
+  "function selectWinner(address agent) external",
+  "function dispute(address against, string reason) external",
+  "function resolveDispute(address winner) external",
+  "function finalize() external",
+  "function cancel() external",
+  "function getSubmissions() external view returns (tuple(address agent, bytes32 proofHash, string evidenceURI, uint256 submittedAt, uint256 stake, bool disqualified)[])",
+  "function getConfig() external view returns (tuple(address coordinator, address verifier, address token, uint256 reward, uint256 stakeRequired, uint256 deadline, uint256 disputeWindow, bytes32 criteriaHash, string criteriaURI, bool humanGateEnabled, uint8 status))",
+  "function getSubmission(address agent) external view returns (tuple(address agent, bytes32 proofHash, string evidenceURI, uint256 submittedAt, uint256 stake, bool disqualified))"
+]
