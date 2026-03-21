@@ -1,6 +1,6 @@
 # Mandala — Human + Agent Conversation Log
 
-This log captures the collaboration between Sid (human) and Hermes (AI agent, claude-sonnet-4-6)
+This log captures the collaboration between Sid (human, @zapmarkets) and Hermes (AI agent, claude-opus-4-6)
 throughout the Synthesis hackathon build. Required field for submission.
 
 ---
@@ -74,11 +74,64 @@ over a shared registry pattern to avoid cross-task state contamination.
 
 ---
 
+## Session 4 — March 21, 2026
+
+**Sid:** "cool. now lets audit the contracts, and then refine them too"
+
+**Hermes:** Ran comprehensive security audit across all Mandala contracts. Found 22 issues across 4 severity levels (5 Critical, 7 High, 6 Medium, 4 Low) plus 5 Informational. Applied all fixes:
+
+**Critical fixes:**
+- C-01: Fee-on-transfer balance-delta pattern in MandalaTask.initialize()
+- C-02: Slashed stakes now transfer to treasury instead of being locked
+- C-03: selectWinner restricted to Open state only (no dispute window reset)
+- C-04: cancel() restricted to Open state only (no stealing reward after winner selected)
+- C-05: recordWin no longer double-increments totalTasks
+
+**High fixes:**
+- H-01: Dispute target validated as actual submitter
+- H-02: ERC20 try/catch + pull-based withdrawals for failed transfers
+- H-03: Deadline enforcement on selectWinner (must wait for deadline)
+- H-05: Disqualified agent check in resolveDispute
+- H-07: Guarded receive() functions reject accidental ETH
+
+**Medium fixes:**
+- M-01: MAX_SUBMISSIONS = 100 cap to prevent gas DoS
+- M-02: Reject ETH sent with ERC20 tasks
+- M-03: threshold = 0 now disables human gate entirely
+- M-04: Event emission in recordTaskParticipation
+- M-05: Explicit reward parameter instead of allowance inference
+- M-06: revokeTaskRole function added for completed tasks
+
+**Low fixes:**
+- L-01: Comment fix in reputation score
+- L-02: Removed dead stakedBalance field
+- L-03: criteriaHash validation (non-zero required)
+- L-04: NatSpec documentation added
+
+**Tests:** 113 passing (up from 88). 25 new tests covering all audit findings.
+
+Full audit report: docs/audit-report.md
+
+---
+
+## Session 5 — March 21, 2026
+
+**Sid:** "cool update docs if needed, write docs for audit too"
+
+**Hermes:** Rewrote all documentation to reflect post-audit state:
+- docs/build-plan.md — updated all phase statuses, prize table, demo description
+- docs/conversation-log.md — added Session 4 (audit) and Session 5 (docs)
+- docs/audit-fixes.md — new file: every finding with its fix and covering test
+
+---
+
 ## What's Left
 
 - [ ] Deploy to Base Sepolia + verify contracts
 - [ ] MetaMask Delegation integration (MandalaAllowance.sol)
 - [ ] Demo video
-- [x] Tests passing + contracts clean (88/88)
+- [x] Tests passing + contracts audited (113/113)
 - [x] TypeScript demo scripts
 - [x] Submission creation via API
+- [x] Security audit + all fixes applied
+- [x] Documentation complete
