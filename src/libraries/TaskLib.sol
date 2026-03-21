@@ -56,7 +56,6 @@ library TaskLib {
         uint256 totalTasks;
         uint256 wins;
         uint256 disputes;
-        uint256 stakedBalance;
         bool    suspended;
         uint256 registeredAt;
     }
@@ -92,4 +91,15 @@ library TaskLib {
     error Unauthorized();
     error InvalidThreshold();
     error PolicyPaused();
+    error TooManySubmissions();
+    error UnexpectedETH();
+    error DisputeTargetNotSubmitter();
+    error CancelNotAllowed();
+    error InvalidCriteriaHash();
+
+    // -------------------------------------------------------------------------
+    // Events
+    // -------------------------------------------------------------------------
+
+    event TaskParticipation(address indexed agent);
 }

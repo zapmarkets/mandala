@@ -27,7 +27,8 @@ contract DeployMandala is Script {
         MandalaPolicy pol = new MandalaPolicy(
             deployer,
             humanGateThreshold,
-            minStake
+            minStake,
+            treasury
         );
         console.log("MandalaPolicy:        ", address(pol));
 

@@ -38,4 +38,5 @@ interface IMandalaPolicy {
     function removeHuman(address human) external;
     function blacklist(address agent) external;
     function whitelist(address agent) external;
+    function treasury() external view returns (address);
 }

@@ -29,6 +29,8 @@ contract MandalaFactory is IMandalaFactory, AccessControl {
     address public treasury;
     uint256 public protocolFeeBps; // basis points e.g. 100 = 1%
 
+    bool private _deploying; // H-07: track deployment context for receive()
+
     address[] private _allTasks;
     mapping(address => address[]) private _tasksByCoordinator;
 
@@ -73,7 +75,9 @@ contract MandalaFactory is IMandalaFactory, AccessControl {
         if (!agentRegistry.isRegistered(msg.sender)) revert TaskLib.AgentNotRegistered();
         if (agentRegistry.isSuspended(msg.sender)) revert TaskLib.AgentSuspended();
 
-        uint256 reward = params.token == address(0) ? msg.value : _pullERC20Reward(params.token);
+        _deploying = true;
+
+        uint256 reward = params.token == address(0) ? msg.value : _pullERC20Reward(params.token, params.reward);
 
         if (reward == 0) revert TaskLib.InsufficientReward();
         if (params.deadline <= block.timestamp) revert TaskLib.TaskExpired();
@@ -120,6 +124,8 @@ contract MandalaFactory is IMandalaFactory, AccessControl {
         _tasksByCoordinator[msg.sender].push(taskAddress);
 
         emit TaskDeployed(taskAddress, msg.sender, params.token, netReward, params.deadline);
+
+        _deploying = false;
     }
 
     // -------------------------------------------------------------------------
@@ -158,14 +164,12 @@ contract MandalaFactory is IMandalaFactory, AccessControl {
     // Internal
     // -------------------------------------------------------------------------
 
-    function _pullERC20Reward(address token) internal returns (uint256) {
-        // caller must have approved factory for reward amount
-        // we check balance delta to handle fee-on-transfer tokens
+    function _pullERC20Reward(address token, uint256 amount) internal returns (uint256) {
+        // M-05: use explicit reward amount instead of allowance
+        if (amount == 0) revert TaskLib.InsufficientReward();
+        // balance-delta to handle fee-on-transfer tokens
         uint256 before = IERC20(token).balanceOf(address(this));
-        // amount is inferred from allowance -- caller approves exact amount
-        uint256 allowance = IERC20(token).allowance(msg.sender, address(this));
-        if (allowance == 0) revert TaskLib.InsufficientReward();
-        IERC20(token).safeTransferFrom(msg.sender, address(this), allowance);
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
         uint256 after_ = IERC20(token).balanceOf(address(this));
         return after_ - before;
     }
@@ -179,5 +183,8 @@ contract MandalaFactory is IMandalaFactory, AccessControl {
         }
     }
 
-    receive() external payable {}
+    // H-07: restrict receive() to only accept ETH during deploy context
+    receive() external payable {
+        if (!_deploying) revert TaskLib.UnexpectedETH();
+    }
 }

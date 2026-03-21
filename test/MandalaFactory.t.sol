@@ -31,7 +31,7 @@ contract MandalaFactoryTest is Test {
     function setUp() public {
         vm.startPrank(admin);
 
-        pol      = new MandalaPolicy(admin, GATE_THRESH, STAKE);
+        pol      = new MandalaPolicy(admin, GATE_THRESH, STAKE, treasury);
         registry = new MandalaAgentRegistry(admin, address(pol));
         taskImpl = new MandalaTask();
         factory  = new MandalaFactory(
@@ -63,7 +63,8 @@ contract MandalaFactoryTest is Test {
             disputeWindow:    1 hours,
             criteriaHash:     keccak256("criteria"),
             criteriaURI:      "ipfs://criteria",
-            humanGateEnabled: false
+            humanGateEnabled: false,
+            reward:           0
         });
     }
 

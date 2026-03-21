@@ -23,6 +23,7 @@ interface IMandalaFactory {
         bytes32 criteriaHash;
         string  criteriaURI;
         bool    humanGateEnabled;
+        uint256 reward;          // explicit reward amount (for ERC20 tasks)
     }
 
     /// @notice Deploy a new task clone. Send ETH as reward (or approve ERC20 first)

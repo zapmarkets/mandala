@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import { Test, console } from "forge-std/Test.sol";
+import { Test } from "forge-std/Test.sol";
 import { MandalaPolicy }        from "../src/MandalaPolicy.sol";
 import { MandalaAgentRegistry } from "../src/MandalaAgentRegistry.sol";
 import { MandalaTask }          from "../src/MandalaTask.sol";
 import { MandalaFactory }       from "../src/MandalaFactory.sol";
 import { IMandalaFactory }      from "../src/interfaces/IMandalaFactory.sol";
-import { IMandalaAgentRegistry } from "../src/interfaces/IMandalaAgentRegistry.sol";
 import { TaskLib }              from "../src/libraries/TaskLib.sol";
 
 contract MandalaTaskTest is Test {
@@ -35,7 +34,7 @@ contract MandalaTaskTest is Test {
     function setUp() public {
         vm.startPrank(admin);
 
-        pol      = new MandalaPolicy(admin, GATE_THRESH, STAKE);
+        pol      = new MandalaPolicy(admin, GATE_THRESH, STAKE, treasury);
         registry = new MandalaAgentRegistry(admin, address(pol));
         taskImpl = new MandalaTask();
         factory  = new MandalaFactory(
@@ -82,11 +81,17 @@ contract MandalaTaskTest is Test {
             disputeWindow:    1 hours,
             criteriaHash:     keccak256("write a solidity ERC20"),
             criteriaURI:      "ipfs://criteria",
-            humanGateEnabled: false
+            humanGateEnabled: false,
+            reward:           0
         });
 
         vm.prank(coordinator);
         taskAddr = factory.deployTask{value: REWARD}(p);
+    }
+
+    /// @dev Warp past the task deadline so selectWinner can be called
+    function _warpPastDeadline() internal {
+        vm.warp(block.timestamp + 1 days + 1);
     }
 
     // -------------------------------------------------------------------------
@@ -123,6 +128,8 @@ contract MandalaTaskTest is Test {
         vm.prank(agentA); task.submitProof{value: STAKE}(keccak256("proofA"), "ipfs://proofA");
         vm.prank(agentB); task.submitProof{value: STAKE}(keccak256("proofB"), "ipfs://proofB");
 
+        _warpPastDeadline();
+
         vm.prank(verifier); task.selectWinner(agentB);
 
         assertEq(task.pendingWinner(), agentB);
@@ -136,6 +143,7 @@ contract MandalaTaskTest is Test {
         vm.prank(agentA); task.submitProof{value: STAKE}(keccak256("proofA"), "ipfs://proofA");
         vm.prank(agentB); task.submitProof{value: STAKE}(keccak256("proofB"), "ipfs://proofB");
 
+        _warpPastDeadline();
         vm.prank(verifier); task.selectWinner(agentA);
 
         // fast forward past dispute window
@@ -156,9 +164,10 @@ contract MandalaTaskTest is Test {
         vm.prank(agentA); task.submitProof{value: STAKE}(keccak256("proofA"), "ipfs://proofA");
         vm.prank(agentB); task.submitProof{value: STAKE}(keccak256("proofB"), "ipfs://proofB");
 
+        vm.warp(block.timestamp + 1 days + 1);
         vm.prank(verifier); task.selectWinner(agentA);
 
-        // agentB disputes
+        // agentB disputes (within dispute window)
         vm.prank(agentB); task.dispute(agentA, "agentA's proof is incomplete");
 
         assertEq(uint256(task.getConfig().status), uint256(TaskLib.TaskStatus.Disputed));
@@ -211,11 +220,153 @@ contract MandalaTaskTest is Test {
         MandalaTask task = MandalaTask(payable(t));
 
         vm.prank(agentA); task.submitProof{value: STAKE}(keccak256("proofA"), "ipfs://proofA");
+
+        _warpPastDeadline();
         vm.prank(verifier); task.selectWinner(agentA);
         vm.warp(block.timestamp + 2 hours);
         task.finalize();
 
         TaskLib.AgentInfo memory info = registry.getAgent(agentA);
         assertEq(info.wins, 1);
+    }
+
+    // -------------------------------------------------------------------------
+    // New audit tests
+    // -------------------------------------------------------------------------
+
+    /// @dev H-03: selectWinner reverts before deadline
+    function test_selectWinnerRevertsBeforeDeadline() public {
+        address t = _deployTask();
+        MandalaTask task = MandalaTask(payable(t));
+
+        vm.prank(agentA); task.submitProof{value: STAKE}(keccak256("proofA"), "ipfs://proofA");
+
+        // Do NOT warp past deadline
+        vm.prank(verifier);
+        vm.expectRevert(TaskLib.DeadlineNotPassed.selector);
+        task.selectWinner(agentA);
+    }
+
+    /// @dev C-03: selectWinner reverts from Verifying state (only Open allowed)
+    function test_selectWinnerRevertsFromVerifyingState() public {
+        address t = _deployTask();
+        MandalaTask task = MandalaTask(payable(t));
+
+        vm.prank(agentA); task.submitProof{value: STAKE}(keccak256("proofA"), "ipfs://proofA");
+        vm.prank(agentB); task.submitProof{value: STAKE}(keccak256("proofB"), "ipfs://proofB");
+
+        _warpPastDeadline();
+        vm.prank(verifier); task.selectWinner(agentA);
+
+        // now in Verifying state, try to re-select
+        vm.prank(verifier);
+        vm.expectRevert(TaskLib.TaskAlreadyFinalized.selector);
+        task.selectWinner(agentB);
+    }
+
+    /// @dev C-04: cancel reverts from Verifying state
+    function test_cancelRevertsFromVerifyingState() public {
+        address t = _deployTask();
+        MandalaTask task = MandalaTask(payable(t));
+
+        vm.prank(agentA); task.submitProof{value: STAKE}(keccak256("proofA"), "ipfs://proofA");
+
+        _warpPastDeadline();
+        vm.prank(verifier); task.selectWinner(agentA);
+
+        // task is now Verifying; cancel should fail
+        vm.prank(coordinator);
+        vm.expectRevert(TaskLib.CancelNotAllowed.selector);
+        task.cancel();
+    }
+
+    /// @dev H-01: dispute reverts if 'against' is not a submitter
+    function test_disputeRevertsAgainstNonSubmitter() public {
+        address t = _deployTask();
+        MandalaTask task = MandalaTask(payable(t));
+
+        vm.prank(agentA); task.submitProof{value: STAKE}(keccak256("proofA"), "ipfs://proofA");
+
+        _warpPastDeadline();
+        vm.prank(verifier); task.selectWinner(agentA);
+
+        // agentC never submitted; dispute against them should revert
+        vm.prank(agentA);
+        vm.expectRevert(TaskLib.DisputeTargetNotSubmitter.selector);
+        task.dispute(agentC, "agentC did not submit");
+    }
+
+    /// @dev C-05: reputation not double-counted on win
+    ///      recordWin only increments wins (not totalTasks), submitProof already called recordTaskParticipation
+    function test_reputationNotDoubleCountedOnWin() public {
+        address t = _deployTask();
+        MandalaTask task = MandalaTask(payable(t));
+
+        vm.prank(agentA); task.submitProof{value: STAKE}(keccak256("proofA"), "ipfs://proofA");
+
+        _warpPastDeadline();
+        vm.prank(verifier); task.selectWinner(agentA);
+        vm.warp(block.timestamp + 2 hours);
+        task.finalize();
+
+        TaskLib.AgentInfo memory info = registry.getAgent(agentA);
+        // submitProof calls recordTaskParticipation -> totalTasks=1
+        // finalize calls recordWin -> wins=1, totalTasks stays 1
+        // reputation = wins * 100 / totalTasks = 1 * 100 / 1 = 100
+        assertEq(info.totalTasks, 1);
+        assertEq(info.wins, 1);
+        assertEq(registry.reputationScore(agentA), 100);
+    }
+
+    /// @dev L-03: criteriaHash must not be bytes32(0)
+    function test_criteriaHashRequired() public {
+        IMandalaFactory.DeployParams memory p = IMandalaFactory.DeployParams({
+            verifier:         verifier,
+            token:            address(0),
+            stakeRequired:    STAKE,
+            deadline:         block.timestamp + 1 days,
+            disputeWindow:    1 hours,
+            criteriaHash:     bytes32(0),
+            criteriaURI:      "ipfs://criteria",
+            humanGateEnabled: false,
+            reward:           0
+        });
+
+        vm.prank(coordinator);
+        vm.expectRevert(TaskLib.InvalidCriteriaHash.selector);
+        factory.deployTask{value: REWARD}(p);
+    }
+
+    /// @dev M-03: humanGateThreshold of 0 disables gate
+    function test_humanGateThresholdZeroDisablesGate() public {
+        vm.prank(human);
+        pol.setHumanGateThreshold(0);
+
+        // Even high value tasks should not require human gate
+        assertFalse(pol.requiresHumanGate(1000 ether));
+        assertFalse(pol.requiresHumanGate(0));
+    }
+
+    /// @dev C-02: slashed stake sent to treasury
+    function test_slashedStakeSentToTreasury() public {
+        address t = _deployTask();
+        MandalaTask task = MandalaTask(payable(t));
+
+        vm.prank(agentA); task.submitProof{value: STAKE}(keccak256("proofA"), "ipfs://proofA");
+        vm.prank(agentB); task.submitProof{value: STAKE}(keccak256("proofB"), "ipfs://proofB");
+
+        _warpPastDeadline();
+        vm.prank(verifier); task.selectWinner(agentA);
+
+        // dispute
+        vm.prank(agentB); task.dispute(agentA, "cheating");
+
+        uint256 treasuryBefore = treasury.balance;
+
+        // human cancels -> slash agentA
+        vm.prank(human); task.resolveDispute(address(0));
+
+        // treasury should receive slashed stake
+        assertEq(treasury.balance - treasuryBefore, STAKE);
     }
 }

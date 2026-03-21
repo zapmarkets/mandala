@@ -25,9 +25,14 @@ contract MandalaTask is IMandalaTask, Initializable, ReentrancyGuard {
     IMandalaAgentRegistry public agentRegistry;
     IMandalaPolicy public policy;
 
+    uint256 public constant MAX_SUBMISSIONS = 100;
+
     // submissions by agent address
     mapping(address => TaskLib.Submission) private _submissions;
     address[] private _submitters;
+
+    // H-02: pending withdrawals for failed ERC20 stake returns
+    mapping(address => uint256) public pendingWithdrawals;
 
     // dispute tracking
     address public disputant;
@@ -86,10 +91,12 @@ contract MandalaTask is IMandalaTask, Initializable, ReentrancyGuard {
     // Initializer (called by factory after clone)
     // -------------------------------------------------------------------------
 
+    /// @dev If p.verifier == address(0), any registered non-suspended agent can act as verifier (L-04)
     function initialize(IMandalaTask.InitParams calldata p) external payable initializer {
         if (p.coordinator == address(0)) revert TaskLib.ZeroAddress();
         if (p.deadline <= block.timestamp) revert TaskLib.TaskExpired();
         if (p.reward == 0) revert TaskLib.InsufficientReward();
+        if (p.criteriaHash == bytes32(0)) revert TaskLib.InvalidCriteriaHash();
 
         // ETH reward: msg.value must match
         if (p.token == address(0)) {
@@ -114,8 +121,11 @@ contract MandalaTask is IMandalaTask, Initializable, ReentrancyGuard {
         });
 
         // ERC20 reward: transfer from factory (factory approved task first)
+        // C-01: use balance-delta to handle fee-on-transfer tokens
         if (p.token != address(0)) {
+            uint256 before = IERC20(p.token).balanceOf(address(this));
             IERC20(p.token).safeTransferFrom(msg.sender, address(this), p.reward);
+            _config.reward = IERC20(p.token).balanceOf(address(this)) - before;
         }
     }
 
@@ -130,6 +140,8 @@ contract MandalaTask is IMandalaTask, Initializable, ReentrancyGuard {
         string calldata evidenceURI
     ) external payable nonReentrant notPaused onlyOpen {
         if (block.timestamp > _config.deadline) revert TaskLib.TaskExpired();
+        if (_submitters.length >= MAX_SUBMISSIONS) revert TaskLib.TooManySubmissions();
+        if (_config.token != address(0) && msg.value > 0) revert TaskLib.UnexpectedETH();
         if (!agentRegistry.isRegistered(msg.sender)) revert TaskLib.NotRegisteredAgent();
         if (agentRegistry.isSuspended(msg.sender)) revert TaskLib.AgentSuspended();
         if (policy.isBlacklisted(msg.sender)) revert TaskLib.AgentSuspended();
@@ -178,11 +190,10 @@ contract MandalaTask is IMandalaTask, Initializable, ReentrancyGuard {
     /// @notice Verifier reviews all proofs and selects the best one.
     ///         Moves task to Verifying state, starts dispute window.
     function selectWinner(address agent) external notPaused onlyVerifier {
-        // can call from Open (if deadline passed) or already Verifying (revote)
-        if (
-            _config.status != TaskLib.TaskStatus.Open &&
-            _config.status != TaskLib.TaskStatus.Verifying
-        ) revert TaskLib.TaskAlreadyFinalized();
+        // C-03: only allow from Open state
+        if (_config.status != TaskLib.TaskStatus.Open) revert TaskLib.TaskAlreadyFinalized();
+        // H-03: deadline must have passed before selecting winner
+        if (block.timestamp <= _config.deadline) revert TaskLib.DeadlineNotPassed();
 
         if (_submitters.length == 0) revert TaskLib.NoSubmissions();
         if (_submissions[agent].agent == address(0)) revert TaskLib.InvalidWinner();
@@ -206,6 +217,8 @@ contract MandalaTask is IMandalaTask, Initializable, ReentrancyGuard {
     ) external notPaused {
         if (_config.status != TaskLib.TaskStatus.Verifying) revert TaskLib.TaskNotVerifying();
         if (block.timestamp > winnerSelectedAt + _config.disputeWindow) revert TaskLib.DisputeWindowExpired();
+        // H-01: validate target is actually a submitter
+        if (_submissions[against].agent == address(0)) revert TaskLib.DisputeTargetNotSubmitter();
         if (!agentRegistry.isRegistered(msg.sender) && msg.sender != _config.coordinator) {
             revert TaskLib.NotRegisteredAgent();
         }
@@ -232,6 +245,8 @@ contract MandalaTask is IMandalaTask, Initializable, ReentrancyGuard {
         }
 
         if (_submissions[winner].agent == address(0)) revert TaskLib.InvalidWinner();
+        // H-05: disqualified agents cannot be selected as winner
+        if (_submissions[winner].disqualified) revert TaskLib.InvalidWinner();
         pendingWinner  = winner;
         _config.status = TaskLib.TaskStatus.Verifying;
         winnerSelectedAt = block.timestamp; // restart dispute window from now
@@ -283,10 +298,8 @@ contract MandalaTask is IMandalaTask, Initializable, ReentrancyGuard {
 
     /// @notice Coordinator can cancel if no submissions yet, or after deadline with no winner
     function cancel() external nonReentrant notPaused onlyCoordinator {
-        if (
-            _config.status == TaskLib.TaskStatus.Finalized ||
-            _config.status == TaskLib.TaskStatus.Cancelled
-        ) revert TaskLib.TaskAlreadyFinalized();
+        // C-04: only allow cancel from Open state
+        if (_config.status != TaskLib.TaskStatus.Open) revert TaskLib.CancelNotAllowed();
 
         // if there are submissions, can only cancel after deadline
         if (_submitters.length > 0) {
@@ -373,9 +386,27 @@ contract MandalaTask is IMandalaTask, Initializable, ReentrancyGuard {
                 return;
             }
         } else {
-            IERC20(_config.token).safeTransfer(agent, stake);
+            // H-02: wrap ERC20 transfer in try/catch; on failure, add to pendingWithdrawals
+            try IERC20(_config.token).transfer(agent, stake) returns (bool success) {
+                if (!success) {
+                    pendingWithdrawals[agent] += stake;
+                    return;
+                }
+            } catch {
+                pendingWithdrawals[agent] += stake;
+                return;
+            }
         }
         emit StakeReturned(agent, stake);
+    }
+
+    /// @notice Claim any pending ERC20 withdrawals from failed stake returns
+    function claimPendingWithdrawal() external nonReentrant {
+        uint256 amount = pendingWithdrawals[msg.sender];
+        if (amount == 0) revert TaskLib.InsufficientStake();
+        pendingWithdrawals[msg.sender] = 0;
+        IERC20(_config.token).safeTransfer(msg.sender, amount);
+        emit StakeReturned(msg.sender, amount);
     }
 
     function _slashAndRefund() internal {
@@ -387,8 +418,15 @@ contract MandalaTask is IMandalaTask, Initializable, ReentrancyGuard {
         _submissions[disputedAgainst].disqualified = true;
 
         if (slashedStake > 0) {
+            // C-02: send slashed stake to treasury
+            address treasuryAddr = address(policy) != address(0) ? policy.treasury() : address(this);
+            if (_config.token == address(0)) {
+                (bool ok, ) = treasuryAddr.call{value: slashedStake}("");
+                if (!ok) revert TaskLib.TransferFailed();
+            } else {
+                IERC20(_config.token).safeTransfer(treasuryAddr, slashedStake);
+            }
             emit StakeSlashed(disputedAgainst, slashedStake);
-            // TODO: send slashed stake to protocol treasury (wired up via policy)
         }
 
         // return stakes to all other agents
@@ -410,8 +448,16 @@ contract MandalaTask is IMandalaTask, Initializable, ReentrancyGuard {
     }
 
     // -------------------------------------------------------------------------
-    // Receive ETH (for ETH reward deposits)
+    // Receive ETH (for ETH reward + stake deposits)
     // -------------------------------------------------------------------------
 
     receive() external payable {}
+
+    /// @notice Admin rescue function for stuck tokens (H-07)
+    function rescueERC20(address token, address to, uint256 amount) external onlyCoordinator {
+        if (_config.status != TaskLib.TaskStatus.Finalized && _config.status != TaskLib.TaskStatus.Cancelled) {
+            revert TaskLib.TaskNotOpen();
+        }
+        IERC20(token).safeTransfer(to, amount);
+    }
 }

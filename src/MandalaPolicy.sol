@@ -16,6 +16,7 @@ contract MandalaPolicy is IMandalaPolicy, AccessControl, Pausable {
 
     uint256 public humanGateThreshold;  // tasks with reward above this require human approval
     uint256 public minStakeRequired;    // protocol-wide minimum stake per submission
+    address public treasury;
 
     mapping(address => bool) private _blacklisted;
 
@@ -26,9 +27,11 @@ contract MandalaPolicy is IMandalaPolicy, AccessControl, Pausable {
     constructor(
         address admin,
         uint256 _humanGateThreshold,
-        uint256 _minStake
+        uint256 _minStake,
+        address _treasury
     ) {
         if (admin == address(0)) revert TaskLib.ZeroAddress();
+        if (_treasury == address(0)) revert TaskLib.ZeroAddress();
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(HUMAN_ROLE, admin);
@@ -36,6 +39,7 @@ contract MandalaPolicy is IMandalaPolicy, AccessControl, Pausable {
 
         humanGateThreshold = _humanGateThreshold;
         minStakeRequired   = _minStake;
+        treasury = _treasury;
     }
 
     // -------------------------------------------------------------------------
@@ -55,6 +59,7 @@ contract MandalaPolicy is IMandalaPolicy, AccessControl, Pausable {
     }
 
     function requiresHumanGate(uint256 value) external view returns (bool) {
+        if (humanGateThreshold == 0) return false;
         return value >= humanGateThreshold;
     }
 
@@ -101,5 +106,10 @@ contract MandalaPolicy is IMandalaPolicy, AccessControl, Pausable {
     function whitelist(address agent) external onlyRole(HUMAN_ROLE) {
         _blacklisted[agent] = false;
         emit AgentWhitelisted(agent);
+    }
+
+    function setTreasury(address _treasury) external onlyRole(HUMAN_ROLE) {
+        if (_treasury == address(0)) revert TaskLib.ZeroAddress();
+        treasury = _treasury;
     }
 }

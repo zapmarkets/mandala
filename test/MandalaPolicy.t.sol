@@ -19,7 +19,7 @@ contract MandalaPolicyTest is Test {
 
     function setUp() public {
         vm.prank(admin);
-        pol = new MandalaPolicy(admin, GATE_THRESH, MIN_STAKE);
+        pol = new MandalaPolicy(admin, GATE_THRESH, MIN_STAKE, makeAddr("treasury"));
 
         // admin adds human
         vm.prank(admin);
@@ -40,7 +40,7 @@ contract MandalaPolicyTest is Test {
 
     function test_constructorRevertsZeroAdmin() public {
         vm.expectRevert(TaskLib.ZeroAddress.selector);
-        new MandalaPolicy(address(0), GATE_THRESH, MIN_STAKE);
+        new MandalaPolicy(address(0), GATE_THRESH, MIN_STAKE, makeAddr("treasury"));
     }
 
     // -------------------------------------------------------------------------
@@ -240,5 +240,44 @@ contract MandalaPolicyTest is Test {
         assertTrue(pol.isHuman(admin));
         assertTrue(pol.isHuman(human));
         assertFalse(pol.isHuman(nobody));
+    }
+
+    // -------------------------------------------------------------------------
+    // Treasury
+    // -------------------------------------------------------------------------
+
+    function test_treasury() public {
+        assertEq(pol.treasury(), makeAddr("treasury"));
+    }
+
+    function test_setTreasury() public {
+        address newTreasury = makeAddr("newTreasury");
+        vm.prank(human);
+        pol.setTreasury(newTreasury);
+        assertEq(pol.treasury(), newTreasury);
+    }
+
+    function test_setTreasury_revert_zero() public {
+        vm.prank(human);
+        vm.expectRevert(TaskLib.ZeroAddress.selector);
+        pol.setTreasury(address(0));
+    }
+
+    function test_constructorRevertsZeroTreasury() public {
+        vm.expectRevert(TaskLib.ZeroAddress.selector);
+        new MandalaPolicy(admin, GATE_THRESH, MIN_STAKE, address(0));
+    }
+
+    // -------------------------------------------------------------------------
+    // M-03: humanGateThreshold == 0 disables gate
+    // -------------------------------------------------------------------------
+
+    function test_humanGateThresholdZeroDisablesGate() public {
+        vm.prank(human);
+        pol.setHumanGateThreshold(0);
+
+        assertFalse(pol.requiresHumanGate(0));
+        assertFalse(pol.requiresHumanGate(1 ether));
+        assertFalse(pol.requiresHumanGate(1000 ether));
     }
 }

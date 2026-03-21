@@ -24,7 +24,7 @@ contract MandalaAgentRegistryTest is Test {
 
     function setUp() public {
         vm.startPrank(admin);
-        pol      = new MandalaPolicy(admin, GATE_THRESH, MIN_STAKE);
+        pol      = new MandalaPolicy(admin, GATE_THRESH, MIN_STAKE, makeAddr("treasury"));
         registry = new MandalaAgentRegistry(admin, address(pol));
 
         pol.addHuman(human);
@@ -173,12 +173,13 @@ contract MandalaAgentRegistryTest is Test {
         registry.grantTaskRole(taskContract);
 
         vm.startPrank(taskContract);
-        registry.recordWin(agentA); // totalTasks=1, wins=1
-        registry.recordTaskParticipation(agentA); // totalTasks=2
+        // C-05: recordWin no longer increments totalTasks (submitProof already did via recordTaskParticipation)
+        registry.recordTaskParticipation(agentA); // totalTasks=1 (from submitProof)
+        registry.recordWin(agentA);               // wins=1, totalTasks stays 1
         vm.stopPrank();
 
-        // score = 1 * 100 / 2 = 50
-        assertEq(registry.reputationScore(agentA), 50);
+        // score = 1 * 100 / 1 = 100
+        assertEq(registry.reputationScore(agentA), 100);
     }
 
     // -------------------------------------------------------------------------
@@ -283,5 +284,31 @@ contract MandalaAgentRegistryTest is Test {
             )
         );
         registry.grantTaskRole(taskContract);
+    }
+
+    // -------------------------------------------------------------------------
+    // M-06: revokeTaskRole
+    // -------------------------------------------------------------------------
+
+    function test_revokeTaskRole() public {
+        vm.prank(manager);
+        registry.grantTaskRole(taskContract);
+        assertTrue(registry.hasRole(keccak256("TASK_CONTRACT_ROLE"), taskContract));
+
+        vm.prank(manager);
+        registry.revokeTaskRole(taskContract);
+        assertFalse(registry.hasRole(keccak256("TASK_CONTRACT_ROLE"), taskContract));
+    }
+
+    function test_revokeTaskRole_revert_nonManager() public {
+        vm.prank(nobody);
+        vm.expectRevert(
+            abi.encodeWithSignature(
+                "AccessControlUnauthorizedAccount(address,bytes32)",
+                nobody,
+                keccak256("MANAGER_ROLE")
+            )
+        );
+        registry.revokeTaskRole(taskContract);
     }
 }

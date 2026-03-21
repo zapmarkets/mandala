@@ -61,11 +61,9 @@ contract MandalaAgentRegistry is IMandalaAgentRegistry, AccessControl {
             totalTasks:     0,
             wins:           0,
             disputes:       0,
-            stakedBalance:  0,
             suspended:      false,
             registeredAt:   block.timestamp
         });
-
         _agentList.push(msg.sender);
         emit AgentRegistered(msg.sender, erc8004Id);
     }
@@ -90,7 +88,7 @@ contract MandalaAgentRegistry is IMandalaAgentRegistry, AccessControl {
         return _agentList;
     }
 
-    /// @notice Reputation score: wins * 100 / (totalTasks + 1) to avoid div by zero
+    /// @notice Reputation score: wins * 100 / totalTasks (returns 0 if no tasks)
     function reputationScore(address agent) external view returns (uint256) {
         TaskLib.AgentInfo memory a = _agents[agent];
         if (a.totalTasks == 0) return 0;
@@ -103,7 +101,6 @@ contract MandalaAgentRegistry is IMandalaAgentRegistry, AccessControl {
 
     function recordWin(address agent) external onlyRole(TASK_CONTRACT_ROLE) {
         _agents[agent].wins += 1;
-        _agents[agent].totalTasks += 1;
         emit ReputationUpdated(agent, _agents[agent].wins, _agents[agent].disputes);
     }
 
@@ -114,6 +111,7 @@ contract MandalaAgentRegistry is IMandalaAgentRegistry, AccessControl {
 
     function recordTaskParticipation(address agent) external onlyRole(TASK_CONTRACT_ROLE) {
         _agents[agent].totalTasks += 1;
+        emit ReputationUpdated(agent, _agents[agent].wins, _agents[agent].disputes);
     }
 
     // -------------------------------------------------------------------------
@@ -133,5 +131,10 @@ contract MandalaAgentRegistry is IMandalaAgentRegistry, AccessControl {
     /// @notice Called by factory to grant a freshly deployed task the TASK_CONTRACT_ROLE
     function grantTaskRole(address taskContract) external onlyRole(MANAGER_ROLE) {
         _grantRole(TASK_CONTRACT_ROLE, taskContract);
+    }
+
+    /// @notice Revoke TASK_CONTRACT_ROLE from a task contract
+    function revokeTaskRole(address taskContract) external onlyRole(MANAGER_ROLE) {
+        _revokeRole(TASK_CONTRACT_ROLE, taskContract);
     }
 }

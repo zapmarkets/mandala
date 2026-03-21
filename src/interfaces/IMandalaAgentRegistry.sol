@@ -11,6 +11,7 @@ interface IMandalaAgentRegistry {
     event ReputationUpdated(address indexed agent, uint256 wins, uint256 disputes);
     event StakeDeposited(address indexed agent, uint256 amount);
     event StakeWithdrawn(address indexed agent, uint256 amount);
+    event TaskParticipation(address indexed agent);
 
     function register(bytes32 erc8004Id, string calldata metadataURI) external;
     function isRegistered(address agent) external view returns (bool);
@@ -22,4 +23,5 @@ interface IMandalaAgentRegistry {
     function grantTaskRole(address taskContract) external;
     function suspend(address agent) external;
     function reinstate(address agent) external;
+    function revokeTaskRole(address taskContract) external;
 }
