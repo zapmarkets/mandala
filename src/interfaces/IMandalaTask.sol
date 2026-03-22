@@ -39,4 +39,5 @@ interface IMandalaTask {
     function getSubmissions() external view returns (TaskLib.Submission[] memory);
     function getConfig() external view returns (TaskLib.TaskConfig memory);
     function getSubmission(address agent) external view returns (TaskLib.Submission memory);
+    function pendingWinner() external view returns (address);
 }

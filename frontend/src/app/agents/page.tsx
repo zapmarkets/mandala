@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getRegistry, truncateAddress } from '@/lib/contracts';
+import { getRegistry, getProvider, truncateAddress } from '@/lib/contracts';
 import { AgentInfo } from '@/lib/types';
 
 export default function AgentsPage() {
   const [agents, setAgents] = useState<AgentInfo[]>([]);
+  const [ensNames, setEnsNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -33,6 +34,30 @@ export default function AgentsPage() {
           })
         );
         setAgents(agentData);
+
+        // Resolve ENS names (on-chain registry + reverse resolution)
+        const names: Record<string, string> = {};
+        const provider = getProvider();
+        await Promise.all(
+          addresses.map(async (addr) => {
+            try {
+              // Check on-chain ensNames mapping first
+              const onChainName: string = await registry.getENSName(addr);
+              if (onChainName) {
+                names[addr] = onChainName;
+                return;
+              }
+              // Fallback: try ENS reverse resolution
+              const resolved = await provider.lookupAddress(addr);
+              if (resolved) {
+                names[addr] = resolved;
+              }
+            } catch {
+              // ENS resolution can fail on local chains — ignore
+            }
+          })
+        );
+        setEnsNames(names);
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
         setError('Failed to load agents: ' + msg);
@@ -76,6 +101,7 @@ export default function AgentsPage() {
             <thead>
               <tr className="border-b border-gray-800">
                 <th className="text-left px-6 py-4 text-xs text-gray-500 uppercase tracking-wider">Agent</th>
+                <th className="text-left px-6 py-4 text-xs text-gray-500 uppercase tracking-wider">ENS Name</th>
                 <th className="text-left px-6 py-4 text-xs text-gray-500 uppercase tracking-wider">ERC-8004 ID</th>
                 <th className="text-center px-6 py-4 text-xs text-gray-500 uppercase tracking-wider">Reputation</th>
                 <th className="text-center px-6 py-4 text-xs text-gray-500 uppercase tracking-wider">Wins</th>
@@ -89,6 +115,13 @@ export default function AgentsPage() {
                 <tr key={agent.agentAddress} className="hover:bg-gray-800/30 transition-colors">
                   <td className="px-6 py-4">
                     <span className="font-mono text-sm text-cyan-400">{truncateAddress(agent.agentAddress)}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    {ensNames[agent.agentAddress] ? (
+                      <span className="text-sm text-purple-400 font-medium">{ensNames[agent.agentAddress]}</span>
+                    ) : (
+                      <span className="text-sm text-gray-600">—</span>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     <span className="font-mono text-xs text-gray-400">{agent.erc8004Id.slice(0, 18)}...</span>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { getFactory, getPolicy, getRegistry, truncateAddress, formatEth } from '@/lib/contracts';
+import { getFactory, getPolicy, getRegistry, getProvider, truncateAddress, formatEth } from '@/lib/contracts';
 
 interface Stats {
   totalAgents: number;
@@ -12,9 +12,15 @@ interface Stats {
   paused: boolean;
 }
 
+interface AgentENS {
+  address: string;
+  ensName: string | null;
+}
+
 export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [tasks, setTasks] = useState<string[]>([]);
+  const [recentAgents, setRecentAgents] = useState<AgentENS[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -41,6 +47,27 @@ export default function DashboardPage() {
           paused,
         });
         setTasks(taskAddrs as string[]);
+
+        // Resolve ENS names for recent agents
+        const agentAddrs = agents as string[];
+        const provider = getProvider();
+        const agentENS: AgentENS[] = await Promise.all(
+          agentAddrs.slice(-5).reverse().map(async (addr: string) => {
+            let ensName: string | null = null;
+            try {
+              const onChain: string = await registry.getENSName(addr);
+              if (onChain) {
+                ensName = onChain;
+              } else {
+                ensName = await provider.lookupAddress(addr);
+              }
+            } catch {
+              // ENS resolution can fail on local chains
+            }
+            return { address: addr, ensName };
+          })
+        );
+        setRecentAgents(agentENS);
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
         setError('Failed to connect: ' + msg);
@@ -126,8 +153,36 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Architecture */}
+        {/* Recent Agents (ENS Identity) */}
         <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-white">Recent Agents</h2>
+            <Link href="/agents" className="text-purple-400 text-sm hover:underline">View All →</Link>
+          </div>
+          {recentAgents.length === 0 ? (
+            <p className="text-gray-500 text-sm py-8 text-center">No agents registered yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {recentAgents.map((agent) => (
+                <div
+                  key={agent.address}
+                  className="flex items-center justify-between p-3 bg-gray-800/40 rounded-lg"
+                >
+                  <span className="font-mono text-sm text-gray-300">{truncateAddress(agent.address)}</span>
+                  {agent.ensName ? (
+                    <span className="text-sm text-purple-400 font-medium">{agent.ensName}</span>
+                  ) : (
+                    <span className="text-xs text-gray-600">No ENS</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Architecture */}
+      <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-6">
           <h2 className="text-lg font-semibold text-white mb-4">Architecture</h2>
           <pre className="text-xs text-gray-400 font-mono leading-relaxed whitespace-pre">
 {`┌─────────────────────────────────────┐
@@ -152,7 +207,6 @@ export default function DashboardPage() {
 │  ERC-8004    │ │   humanGate        │
 └──────────────┘ └────────────────────┘`}
           </pre>
-        </div>
       </div>
     </div>
   );

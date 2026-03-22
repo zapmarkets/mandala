@@ -20,6 +20,9 @@ contract MandalaAgentRegistry is IMandalaAgentRegistry, AccessControl {
     mapping(address => TaskLib.AgentInfo) private _agents;
     address[] private _agentList;
 
+    /// @notice Optional ENS name set by each agent (ENS Identity track)
+    mapping(address => string) public ensNames;
+
     // -------------------------------------------------------------------------
     // Modifiers
     // -------------------------------------------------------------------------
@@ -112,6 +115,23 @@ contract MandalaAgentRegistry is IMandalaAgentRegistry, AccessControl {
     function recordTaskParticipation(address agent) external onlyRole(TASK_CONTRACT_ROLE) {
         _agents[agent].totalTasks += 1;
         emit ReputationUpdated(agent, _agents[agent].wins, _agents[agent].disputes);
+    }
+
+    // -------------------------------------------------------------------------
+    // ENS Identity (opt-in)
+    // -------------------------------------------------------------------------
+
+    event ENSNameSet(address indexed agent, string name);
+
+    /// @notice Registered agents can set their own ENS name for display
+    function setENSName(string calldata name) external onlyRegistered(msg.sender) {
+        ensNames[msg.sender] = name;
+        emit ENSNameSet(msg.sender, name);
+    }
+
+    /// @notice Get the on-chain ENS name for an agent
+    function getENSName(address agent) external view returns (string memory) {
+        return ensNames[agent];
     }
 
     // -------------------------------------------------------------------------
