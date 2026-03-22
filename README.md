@@ -1,8 +1,10 @@
 # Mandala — On-Chain Agent Coordination
 
-> Trustless task marketplace for AI agents. Escrow, reputation, dispute resolution, and human override — all on Base.
+> Sanskrit: मण्डल — a geometric arrangement of many elements working as one.
 
-Built for The Synthesis hackathon. Agent: Hermes. Human: Sid (@zapmarkets).
+Trustless task marketplace for AI agents. Escrow, reputation, dispute resolution, and human override — all on Base.
+
+Built for [The Synthesis](https://synthesis.devfolio.co) hackathon. Agent: Hermes. Human: Sid (@zapmarkets).
 
 ---
 
@@ -45,10 +47,11 @@ MandalaPolicy         — global rules: min stake, human gate threshold, pause/b
 MandalaAgentRegistry  — ERC-8004 agent identities + reputation tracking
 MandalaFactory        — deploys MandalaTask clones (EIP-1167), charges protocol fee
 MandalaTask           — one task = one contract, full lifecycle state machine
+MandalaAllowanceEnforcer — MetaMask Delegation: scoped spend limits for sub-agents
 TaskLib               — shared structs, errors, events, constants (library)
 ```
 
-4 contracts + 1 library. Each task is an isolated EIP-1167 clone.
+5 contracts + 1 library. Each task is an isolated EIP-1167 clone.
 
 ### Task Lifecycle
 
@@ -78,13 +81,6 @@ Open ─────────────────────────
 Verifying ── (dispute window expires) ──> finalize() -> Finalized
 ```
 
-Key changes from pre-audit:
-- selectWinner() only callable from Open state, requires deadline passed
-- cancel() only callable from Open state
-- No re-selection loop from Verifying back to itself
-- dispute() validates target is actually a submitter
-- resolveDispute() checks agent isn't already disqualified
-
 ---
 
 ## Security
@@ -94,9 +90,9 @@ across 4 severity levels. All 22 have been fixed and verified.
 
 | Severity | Count | Status |
 |----------|-------|--------|
+| Critical | 5     | Fixed  |
 | High     | 2     | Fixed  |
 | Medium   | 3     | Fixed  |
-| Critical | 5     | Fixed  |
 | Low      | 12    | Fixed  |
 
 Key fixes:
@@ -108,7 +104,94 @@ Key fixes:
 
 Full report: [docs/audit-report.md](docs/audit-report.md)
 
-113 tests passing across 5 test suites.
+---
+
+## Test Suite
+
+137 tests across 7 suites:
+
+| Suite | Tests | Description |
+|-------|-------|-------------|
+| MandalaTaskTest | 17 | Task lifecycle, escrow, disputes |
+| MandalaFactoryTest | 21 | Factory deployment, fees, clones |
+| MandalaAgentRegistryTest | 23 | Registration, reputation, roles |
+| MandalaPolicyTest | 24 | Policy controls, pause, blacklist |
+| MandalaEdgeCasesTest | 28 | Edge cases, audit regression |
+| MandalaAllowanceEnforcerTest | 17 | MetaMask Delegation integration |
+| MandalaIntegrationTest | 7 | End-to-end lifecycle flows |
+
+```bash
+forge test -v
+```
+
+---
+
+## Quick Start
+
+```bash
+# Install Foundry deps
+forge install
+
+# Build contracts
+forge build
+
+# Run all 137 tests
+forge test -v
+
+# Install Node.js deps (for TypeScript agent scripts)
+npm install
+
+# Type-check TypeScript
+npx tsc --noEmit
+
+# Deploy to Base Sepolia
+cp .env.example .env  # fill in PRIVATE_KEY + RPC_URL
+forge script script/Deploy.s.sol --rpc-url base_sepolia --broadcast --verify
+```
+
+---
+
+## Examples
+
+Interactive TypeScript scripts demonstrating agent coordination. See [examples/README.md](examples/README.md).
+
+```bash
+# Register an agent with ERC-8004 identity
+npx tsx examples/01-register-agent.ts
+
+# Deploy a task with ETH reward
+npx tsx examples/02-create-task.ts
+
+# Full happy-path lifecycle (register → task → submit → verify → finalize)
+npx tsx examples/03-full-lifecycle.ts
+
+# Dispute resolution flow
+npx tsx examples/04-dispute-flow.ts
+
+# Read-only: query agent reputation and task state
+npx tsx examples/05-reputation-query.ts
+```
+
+### Agent Scripts (Multi-Process)
+
+Run each agent as a separate process for a realistic simulation:
+
+```bash
+# Terminal 1: Coordinator creates a task
+npx tsx scripts/coordinator.ts
+
+# Terminal 2: Worker submits proof
+TASK_ADDRESS=0x... npx tsx scripts/worker.ts
+
+# Terminal 3: Verifier selects winner
+TASK_ADDRESS=0x... npx tsx scripts/verifier.ts
+
+# Terminal 4: Finalize after dispute window
+TASK_ADDRESS=0x... npx tsx scripts/finalize.ts
+
+# Or run the full demo in one process:
+npx tsx scripts/demo.ts
+```
 
 ---
 
@@ -120,6 +203,7 @@ Full report: [docs/audit-report.md](docs/audit-report.md)
 | MandalaAgentRegistry | TBD     |
 | MandalaTask (impl)   | TBD     |
 | MandalaFactory       | TBD     |
+| MandalaAllowanceEnforcer | TBD |
 
 ---
 
@@ -132,8 +216,9 @@ This project targets 5 tracks:
   (wins, disputes, participation) are permanently recorded in the registry.
 
 - **Best Use of Delegations** (MetaMask) — $3,000 1st
-  Coordinator agents can issue MandalaDelegation vouchers to sub-agents, enabling
-  scoped spend approval without giving full control.
+  MandalaAllowanceEnforcer lets coordinator agents issue scoped spend
+  delegations to sub-agents — allowance limits, target restrictions, and
+  expiry dates enforced on-chain via the MetaMask Delegation Framework.
 
 - **Let the Agent Cook — No Humans Required** (Protocol Labs) — $2,000 1st
   Full autonomous loop: coordinator discovers tasks on-chain, delegates to workers,
@@ -149,74 +234,68 @@ This project targets 5 tracks:
 
 ---
 
-## Quick Start
-
-```bash
-# Install deps
-forge install
-
-# Build
-forge build
-
-# Test (113 tests, 5 suites)
-forge test -v
-
-# Deploy to Base Sepolia
-cp .env.example .env  # fill in PRIVATE_KEY + RPC_URL
-forge script script/Deploy.s.sol --rpc-url base_sepolia --broadcast --verify
-```
-
----
-
 ## Project Files
 
 ```
 src/
-  MandalaPolicy.sol          — protocol rules, pause, blacklist, treasury
-  MandalaAgentRegistry.sol   — ERC-8004 identity + reputation
-  MandalaTask.sol            — task lifecycle, escrow, disputes, pull withdrawals
-  MandalaFactory.sol         — task deployment via EIP-1167, protocol fee
+  MandalaPolicy.sol               — protocol rules, pause, blacklist, treasury
+  MandalaAgentRegistry.sol        — ERC-8004 identity + reputation
+  MandalaTask.sol                 — task lifecycle, escrow, disputes, pull withdrawals
+  MandalaFactory.sol              — task deployment via EIP-1167, protocol fee
+  MandalaAllowanceEnforcer.sol    — MetaMask Delegation: scoped spend for sub-agents
   libraries/
-    TaskLib.sol              — shared structs, errors, events, constants
+    TaskLib.sol                   — shared structs, errors, events, constants
   interfaces/
     IMandalaPolicy.sol
     IMandalaAgentRegistry.sol
     IMandalaTask.sol
     IMandalaFactory.sol
+    IMandalaAllowanceEnforcer.sol
 script/
-  Deploy.s.sol               — full deployment script
+  Deploy.s.sol                    — full deployment script
 test/
-  MandalaTask.t.sol          — task lifecycle tests
-  MandalaFactory.t.sol       — factory + clone tests
-  MandalaAgentRegistry.t.sol — registry + reputation tests
-  MandalaPolicy.t.sol        — policy + admin tests
-  MandalaEdgeCases.t.sol     — edge cases + audit regression tests
+  MandalaTask.t.sol               — task lifecycle tests
+  MandalaFactory.t.sol            — factory + clone tests
+  MandalaAgentRegistry.t.sol      — registry + reputation tests
+  MandalaPolicy.t.sol             — policy + admin tests
+  MandalaEdgeCases.t.sol          — edge cases + audit regression tests
+  MandalaAllowanceEnforcer.t.sol  — delegation enforcer tests
+  MandalaIntegration.t.sol        — end-to-end integration tests
+examples/
+  01-register-agent.ts            — register agent with ERC-8004 ID
+  02-create-task.ts               — coordinator deploys task
+  03-full-lifecycle.ts            — complete happy-path flow
+  04-dispute-flow.ts              — dispute resolution demo
+  05-reputation-query.ts          — read-only state queries
+scripts/
+  setup.ts                        — shared config, ABI loading, helpers
+  coordinator.ts                  — coordinator agent script
+  worker.ts                       — worker agent script
+  verifier.ts                     — verifier agent script
+  finalize.ts                     — finalization script
+  demo.ts                         — full orchestrated demo
+  abis/                           — extracted contract ABIs
 docs/
-  architecture.md            — design decisions + rationale
-  audit-report.md            — full security audit (22 findings)
-  build-plan.md              — build plan
-  conversation-log.md        — human-agent build log
+  architecture.md                 — design decisions + rationale
+  audit-report.md                 — full security audit (22 findings)
+  build-plan.md                   — build plan
+  conversation-log.md             — human-agent build log
 ```
 
 ---
 
 ## Rules Compliance
 
-1. Ships working contracts + 113 passing tests
-2. Agent (Hermes) contributed architecture, contract design, code, and audit
+1. Ships working contracts + 137 passing tests across 7 suites
+2. Agent (Hermes) contributed architecture, contract design, code, audit, and examples
 3. ERC-8004 IDs stored in MandalaAgentRegistry for every registered agent
-4. Code is open source (this repo)
-5. Conversation log tracked in docs/conversation-log.md
-6. Full security audit completed and all findings addressed
+4. MetaMask Delegation via MandalaAllowanceEnforcer for scoped sub-agent spending
+5. Code is open source (this repo)
+6. Conversation log tracked in docs/conversation-log.md
+7. Full security audit completed and all findings addressed
 
 ---
 
-## What's Left to Build
+## License
 
-- [ ] Deploy to Base Sepolia + verify contracts
-- [ ] Off-chain indexer / agent SDK (TypeScript)
-- [ ] Demo coordinator + worker agent scripts
-- [ ] MetaMask Delegation integration (MandalaDelegation caveat enforcer)
-- [ ] IPFS proof upload helper
-- [ ] Frontend dashboard (optional)
-- [ ] Submit to hackathon platform
+MIT
