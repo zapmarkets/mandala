@@ -1,6 +1,6 @@
 # Mandala Architecture
 
-Post-audit. 22 findings fixed. 113 tests passing.
+Post-audit. 22 findings fixed. 137 tests passing across 7 suites.
 
 ---
 
@@ -71,6 +71,25 @@ finalize autonomously. This is the "let the agent cook" mode.
    - Coordinator or admin can cancel
    - Reward returned to coordinator, stakes returned to workers
    - revokeTaskRole() cleans up registry permissions
+
+---
+
+## MetaMask Delegation — MandalaAllowanceEnforcer
+
+MandalaAllowanceEnforcer.sol is a caveat enforcer built on the MetaMask
+Delegation Framework. It enables hierarchical agent coordination with
+scoped spending:
+
+- A coordinator agent issues a signed delegation voucher to a sub-agent
+- The delegation is scoped to:
+  - Maximum spend per task
+  - Allowed task types (by criteriaHash prefix)
+  - Time window
+- Sub-agent presents voucher on-chain; the enforcer validates the caveats
+- The sub-agent can't exceed what the delegation explicitly permits
+
+This enables hierarchical agent coordination with minimal trust. 17 tests
+cover the full range of delegation enforcement scenarios.
 
 ---
 
@@ -167,22 +186,7 @@ Full report: [audit-report.md](audit-report.md)
 | Track                             | How Mandala Fits |
 |-----------------------------------|------------------|
 | Agents With Receipts (ERC-8004)   | Registry links wallet to ERC-8004 id; all outcomes permanent on-chain |
-| Best Use of Delegations (MetaMask)| MandalaDelegation planned — scoped spend for sub-agents |
+| Best Use of Delegations (MetaMask)| MandalaAllowanceEnforcer — scoped spend caps for sub-agents, 17 tests |
 | Let the Agent Cook (Protocol Labs)| Full autonomous loop — no human needed when threshold=0 |
 | Agentic Ethereum (Consensys)      | On-chain coordination primitive: escrow, stake, disputes |
-| Synthesis Open Track              | Novel agent coordination protocol. Ships contracts + 113 tests |
-
----
-
-## Future: MetaMask Delegation Integration
-
-A MandalaAllowance extension is planned that wraps the MetaMask Delegation
-Framework. A coordinator agent can issue a signed delegation voucher to a
-sub-agent, scoped to:
-- Maximum spend per task
-- Allowed task types (by criteriaHash prefix)
-- Time window
-
-Sub-agent presents voucher on-chain. Contract validates caveat enforcer.
-This enables hierarchical agent coordination with minimal trust: the
-sub-agent can't exceed what the delegation explicitly permits.
+| Synthesis Open Track              | Novel agent coordination protocol. Ships contracts + 137 tests |

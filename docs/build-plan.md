@@ -1,16 +1,17 @@
 # Mandala — Build Plan
 
-## Status: Contracts complete & audited, SDK complete, submission drafted
+## Status: 5 of 7 phases complete. Submission published. Testnet deploy + demo video remaining.
 
 ---
 
 ## Phase 1 — Contracts ✅ COMPLETE
 
-### Core Contracts
+### Core Contracts (5 contracts + 1 library)
 - [x] MandalaPolicy.sol — global rules, pause, blacklist, human gate threshold, treasury
 - [x] MandalaAgentRegistry.sol — ERC-8004 identity, reputation, stake tracking
 - [x] MandalaTask.sol — full lifecycle (Open → Verifying → Disputed → Finalized/Cancelled)
 - [x] MandalaFactory.sol — EIP-1167 clone deployment + protocol fee
+- [x] MandalaAllowanceEnforcer.sol — MetaMask Delegation Framework caveat enforcer
 - [x] TaskLib.sol — shared structs, enums, errors
 
 ### Interfaces
@@ -19,12 +20,14 @@
 - [x] IMandalaAgentRegistry.sol
 - [x] IMandalaPolicy.sol
 
-### Test Suites (113 tests, all passing)
-- [x] MandalaTask.t.sol — core task lifecycle tests
-- [x] MandalaPolicy.t.sol — role management, pause, blacklist, threshold
-- [x] MandalaAgentRegistry.t.sol — registration, reputation, suspend/reinstate
-- [x] MandalaFactory.t.sol — deployment, fee validation, access control
-- [x] MandalaEdgeCases.t.sol — full multi-agent lifecycle, dispute flows, slashing, accounting
+### Test Suites (137 tests, all passing across 7 suites)
+- [x] MandalaTask.t.sol — 17 tests, core task lifecycle
+- [x] MandalaFactory.t.sol — 21 tests, deployment, fee validation, access control
+- [x] MandalaAgentRegistry.t.sol — 23 tests, registration, reputation, suspend/reinstate
+- [x] MandalaPolicy.t.sol — 24 tests, role management, pause, blacklist, threshold
+- [x] MandalaEdgeCases.t.sol — 28 tests, full multi-agent lifecycle, dispute flows, slashing, accounting
+- [x] MandalaAllowanceEnforcer.t.sol — 17 tests, delegation caveat enforcement
+- [x] MandalaIntegration.t.sol — 7 tests, cross-contract integration scenarios
 
 ### Security Audit & Fixes
 - [x] Comprehensive audit: 22 issues found (5 Critical, 7 High, 6 Medium, 4 Low)
@@ -44,18 +47,27 @@ TypeScript scripts demonstrating the full autonomous coordination loop:
 - [x] scripts/finalize.ts — finalize after dispute window
 - [x] scripts/demo.ts — full autonomous loop (all 4 agent roles end-to-end)
 
-ABI fragments in scripts/abis/ for all contracts.
+### Terminal Showcase (5 agents)
+- [x] Interactive terminal demo with 5 autonomous agents running the full loop
+- [x] ABI fragments in scripts/abis/ for all contracts
 
-## Phase 3 — MetaMask Delegation ⬜ NOT STARTED
+## Phase 3 — MetaMask Delegation ✅ COMPLETE
 
-- [ ] MandalaAllowance.sol — caveat enforcer wrapping MetaMask Delegation Framework
-- [ ] Coordinator issues signed delegation to sub-agent with spend cap + task filter
-- [ ] Sub-agent presents delegation voucher when deploying a task on coordinator's behalf
-- [ ] Integration test: coordinator → delegation → sub-agent → task → payout
+- [x] MandalaAllowanceEnforcer.sol — caveat enforcer wrapping MetaMask Delegation Framework
+- [x] Coordinator issues signed delegation to sub-agent with spend cap + task filter
+- [x] Sub-agent presents delegation voucher when deploying a task on coordinator's behalf
+- [x] 17 tests covering delegation caveat enforcement scenarios
+- [x] Integration with existing contract suite verified
 
-## Phase 4 — Submission 📝 DRAFT CREATED
+## Phase 4 — Frontend ✅ COMPLETE
 
-- [x] POST /projects — draft created via Synthesis API
+- [x] Next.js 14 dashboard application
+- [x] Live demo page showcasing agent coordination
+- [x] UI components for task lifecycle visualization
+
+## Phase 5 — Submission ✅ PUBLISHED
+
+- [x] POST /projects — created via Synthesis API
 - Project UUID: `78fa74d42ca0412ab503d9a36df69d5e`
 - Slug: `mandala-on-chain-agent-coordination-5f1c`
 - [x] Tracks attached:
@@ -64,16 +76,20 @@ ABI fragments in scripts/abis/ for all contracts.
   - Let the Agent Cook — Protocol Labs
   - Agent Services on Base — Base
   - Synthesis Open Track — Community
-- [ ] Add demo video
-- [ ] Final description polish
-- [ ] Publish
+- [x] Published on hackathon platform
 
-## Phase 5 — Deploy ⬜ NOT STARTED
+## Phase 6 — Deploy to Base Sepolia ⬜ NOT STARTED
 
-- [ ] Deploy to Base Sepolia
+- [ ] Obtain funded private key for Base Sepolia
+- [ ] Deploy contracts to Base Sepolia
 - [ ] Verify contracts on Basescan
 - [ ] Update submission with deployed addresses
 - [ ] Run demo scripts against live testnet
+
+## Phase 7 — Demo Video ⬜ NOT DONE
+
+- [ ] Record demo video showing full agent coordination loop
+- [ ] Upload and attach to submission
 
 ---
 
@@ -99,18 +115,20 @@ ABI fragments in scripts/abis/ for all contracts.
    - Reputation scores: `(wins * 100) / totalTasks`
    - Portable across tasks, queryable on-chain
 
-Post-audit: all fund flows verified safe against fee-on-transfer tokens, ERC20 DoS, unbounded loops, and state manipulation attacks. 113 tests confirm correctness.
+7. MetaMask delegation allows coordinator to scope sub-agent spending via MandalaAllowanceEnforcer
+
+Post-audit: all fund flows verified safe against fee-on-transfer tokens, ERC20 DoS, unbounded loops, and state manipulation attacks. 137 tests confirm correctness.
 
 ---
 
 ## Prize Targeting
 
-| Track | Prize | What We Have |
+| Track | Prize | Status |
 |---|---|---|
-| Agents With Receipts (ERC-8004) | $2,000 | Working ERC-8004 registry + full demo |
-| Best Use of Delegations | $3,000 | Phase 3 needed (MandalaAllowance.sol) |
-| Let the Agent Cook | $2,000 | Full autonomous loop via demo.ts |
-| Agent Services on Base | varies | Deploy to Base Sepolia needed |
-| Synthesis Open Track | $28k pool | Everything ships |
+| Agents With Receipts (ERC-8004) | $2,000 | ✅ Working ERC-8004 registry + full demo |
+| Best Use of Delegations | $3,000 | ✅ MandalaAllowanceEnforcer complete with 17 tests |
+| Let the Agent Cook | $2,000 | ✅ Full autonomous loop via demo.ts + terminal showcase |
+| Agent Services on Base | varies | ⬜ Deploy to Base Sepolia needed |
+| Synthesis Open Track | $28k pool | ✅ Everything ships (deploy would strengthen) |
 
 Total potential: ~$35,000+
