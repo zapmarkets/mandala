@@ -59,6 +59,17 @@ interface IMandalaStETHTreasury {
     error TaskNotFinalized();
     error TaskNotCancelled();
     error ZeroAmount();
+    error TooEarly();
+    error InvalidTask();
+
+    // -------------------------------------------------------------------------
+
+    /// @notice Emitted when emergency withdrawal is executed after timeout.
+    event EmergencyWithdraw(
+        address indexed taskAddress,
+        address indexed depositor,
+        uint256 wstETHAmount
+    );
 
     // -------------------------------------------------------------------------
     // External functions
@@ -89,4 +100,9 @@ interface IMandalaStETHTreasury {
     /// @param taskAddress Address of the MandalaTask.
     /// @return deposit The TaskDeposit struct.
     function getDeposit(address taskAddress) external view returns (TaskDeposit memory deposit);
+
+    /// @notice Emergency withdrawal for depositor if task never reaches terminal state.
+    ///         Can only be called after EMERGENCY_TIMEOUT (365 days) from deposit.
+    /// @param taskAddress Address of the MandalaTask.
+    function emergencyWithdraw(address taskAddress) external;
 }

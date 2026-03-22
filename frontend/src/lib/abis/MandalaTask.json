@@ -815,6 +815,11 @@
   },
   {
     "type": "error",
+    "name": "TaskNotTerminal",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "TaskNotVerifying",
     "inputs": []
   },

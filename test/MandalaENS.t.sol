@@ -78,4 +78,24 @@ contract MandalaENSTest is Test {
         vm.prank(agentA);
         registry.setENSName("agent-a.eth");
     }
+
+    // -------------------------------------------------------------------------
+    // setENSName: revert if name too long (M-03)
+    // -------------------------------------------------------------------------
+
+    function test_setENSName_revert_tooLong() public {
+        vm.prank(agentA);
+        registry.register(keccak256("a-8004"), "ipfs://a");
+
+        // Build a 256-byte string (exceeds 255 limit)
+        bytes memory longBytes = new bytes(256);
+        for (uint256 i = 0; i < 256; i++) {
+            longBytes[i] = "a";
+        }
+        string memory longName = string(longBytes);
+
+        vm.prank(agentA);
+        vm.expectRevert(MandalaAgentRegistry.ENSNameTooLong.selector);
+        registry.setENSName(longName);
+    }
 }

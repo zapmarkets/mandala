@@ -456,7 +456,7 @@ contract MandalaTask is IMandalaTask, Initializable, ReentrancyGuard {
     /// @notice Admin rescue function for stuck tokens (H-07)
     function rescueERC20(address token, address to, uint256 amount) external onlyCoordinator {
         if (_config.status != TaskLib.TaskStatus.Finalized && _config.status != TaskLib.TaskStatus.Cancelled) {
-            revert TaskLib.TaskNotOpen();
+            revert TaskLib.TaskNotTerminal();
         }
         IERC20(token).safeTransfer(to, amount);
     }

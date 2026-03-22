@@ -96,6 +96,7 @@ library TaskLib {
     error DisputeTargetNotSubmitter();
     error CancelNotAllowed();
     error InvalidCriteriaHash();
+    error TaskNotTerminal();
 
     // -------------------------------------------------------------------------
     // Events

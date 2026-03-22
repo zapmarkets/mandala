@@ -111,5 +111,6 @@ contract MandalaPolicy is IMandalaPolicy, AccessControl, Pausable {
     function setTreasury(address _treasury) external onlyRole(HUMAN_ROLE) {
         if (_treasury == address(0)) revert TaskLib.ZeroAddress();
         treasury = _treasury;
+        emit TreasuryUpdated(_treasury);
     }
 }

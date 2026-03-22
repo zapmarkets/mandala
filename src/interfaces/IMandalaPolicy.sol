@@ -11,6 +11,7 @@ interface IMandalaPolicy {
     event ProtocolResumed(address indexed by);
     event HumanAdded(address indexed human);
     event HumanRemoved(address indexed human);
+    event TreasuryUpdated(address indexed newTreasury);
 
     /// @notice ETH/token threshold above which human gate is auto-enabled
     function humanGateThreshold() external view returns (uint256);

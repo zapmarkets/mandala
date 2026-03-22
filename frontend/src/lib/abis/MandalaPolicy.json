@@ -601,6 +601,19 @@
   },
   {
     "type": "event",
+    "name": "TreasuryUpdated",
+    "inputs": [
+      {
+        "name": "newTreasury",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "Unpaused",
     "inputs": [
       {

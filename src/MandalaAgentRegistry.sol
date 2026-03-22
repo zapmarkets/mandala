@@ -122,9 +122,11 @@ contract MandalaAgentRegistry is IMandalaAgentRegistry, AccessControl {
     // -------------------------------------------------------------------------
 
     event ENSNameSet(address indexed agent, string name);
+    error ENSNameTooLong();
 
     /// @notice Registered agents can set their own ENS name for display
     function setENSName(string calldata name) external onlyRegistered(msg.sender) {
+        if (bytes(name).length > 255) revert ENSNameTooLong();
         ensNames[msg.sender] = name;
         emit ENSNameSet(msg.sender, name);
     }

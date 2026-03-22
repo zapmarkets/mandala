@@ -120,11 +120,12 @@ contract MandalaStETHTreasuryTest is Test {
         // --- Deploy mock wstETH ---
         wstETH = new MockWstETH();
 
-        // --- Deploy stETH treasury (policy, registry, wstETH) ---
+        // --- Deploy stETH treasury (policy, registry, wstETH, factory) ---
         stethTreasury = new MandalaStETHTreasury(
             address(policy),
             address(registry),
-            address(wstETH)
+            address(wstETH),
+            address(factory)
         );
 
         // --- Fund actors with ETH ---
@@ -520,5 +521,125 @@ contract MandalaStETHTreasuryTest is Test {
         MandalaTask task2 = _deployTask();
         uint256 yieldUnfunded = stethTreasury.getYieldAccrued(address(task2));
         assertEq(yieldUnfunded, 0, "Unfunded task should have 0 yield");
+    }
+
+    // =========================================================================
+    //  TEST: H-01 — emergencyWithdraw after 365-day timeout
+    // =========================================================================
+
+    function test_emergencyWithdraw_afterTimeout() public {
+        MandalaTask task = _deployTask();
+
+        vm.startPrank(coordinator);
+        wstETH.approve(address(stethTreasury), WSTETH_FUND);
+        stethTreasury.fundTask(address(task), WSTETH_FUND);
+        vm.stopPrank();
+
+        // Warp 366 days
+        vm.warp(block.timestamp + 366 days);
+
+        uint256 coordBalBefore = wstETH.balanceOf(coordinator);
+
+        vm.prank(coordinator);
+        stethTreasury.emergencyWithdraw(address(task));
+
+        uint256 coordBalAfter = wstETH.balanceOf(coordinator);
+        assertEq(coordBalAfter - coordBalBefore, WSTETH_FUND, "Should receive full wstETH back");
+
+        IMandalaStETHTreasury.TaskDeposit memory dep = stethTreasury.getDeposit(address(task));
+        assertTrue(dep.claimed, "Deposit should be marked as claimed");
+    }
+
+    // =========================================================================
+    //  TEST: H-01 — emergencyWithdraw reverts if too early
+    // =========================================================================
+
+    function test_emergencyWithdraw_revert_tooEarly() public {
+        MandalaTask task = _deployTask();
+
+        vm.startPrank(coordinator);
+        wstETH.approve(address(stethTreasury), WSTETH_FUND);
+        stethTreasury.fundTask(address(task), WSTETH_FUND);
+        vm.stopPrank();
+
+        // Only 100 days — not enough
+        vm.warp(block.timestamp + 100 days);
+
+        vm.prank(coordinator);
+        vm.expectRevert(IMandalaStETHTreasury.TooEarly.selector);
+        stethTreasury.emergencyWithdraw(address(task));
+    }
+
+    // =========================================================================
+    //  TEST: H-01 — emergencyWithdraw reverts if not depositor
+    // =========================================================================
+
+    function test_emergencyWithdraw_revert_notDepositor() public {
+        MandalaTask task = _deployTask();
+
+        vm.startPrank(coordinator);
+        wstETH.approve(address(stethTreasury), WSTETH_FUND);
+        stethTreasury.fundTask(address(task), WSTETH_FUND);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 366 days);
+
+        vm.prank(nobody);
+        vm.expectRevert(IMandalaStETHTreasury.NotCoordinator.selector);
+        stethTreasury.emergencyWithdraw(address(task));
+    }
+
+    // =========================================================================
+    //  TEST: H-02 — paused protocol blocks fundTask, claimReward, refund
+    // =========================================================================
+
+    function test_treasury_paused_reverts() public {
+        MandalaTask task = _deployTask();
+
+        // Pause the protocol
+        vm.prank(admin);
+        policy.pause();
+
+        // fundTask should revert
+        vm.startPrank(coordinator);
+        wstETH.approve(address(stethTreasury), WSTETH_FUND);
+        vm.expectRevert(TaskLib.PolicyPaused.selector);
+        stethTreasury.fundTask(address(task), WSTETH_FUND);
+        vm.stopPrank();
+
+        // Unpause, fund, then pause again to test claimReward and refund
+        vm.prank(admin);
+        policy.unpause();
+
+        vm.startPrank(coordinator);
+        stethTreasury.fundTask(address(task), WSTETH_FUND);
+        vm.stopPrank();
+
+        vm.prank(admin);
+        policy.pause();
+
+        // claimReward should revert
+        vm.prank(agent1);
+        vm.expectRevert(TaskLib.PolicyPaused.selector);
+        stethTreasury.claimReward(address(task));
+
+        // refund should revert
+        vm.prank(coordinator);
+        vm.expectRevert(TaskLib.PolicyPaused.selector);
+        stethTreasury.refund(address(task));
+    }
+
+    // =========================================================================
+    //  TEST: M-01 — fundTask reverts for invalid (non-task) address
+    // =========================================================================
+
+    function test_fundTask_revert_invalidTask() public {
+        address randomAddr = makeAddr("random");
+
+        vm.startPrank(coordinator);
+        wstETH.approve(address(stethTreasury), WSTETH_FUND);
+        vm.expectRevert(IMandalaStETHTreasury.InvalidTask.selector);
+        stethTreasury.fundTask(randomAddr, WSTETH_FUND);
+        vm.stopPrank();
     }
 }

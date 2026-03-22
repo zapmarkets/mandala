@@ -752,6 +752,11 @@
   },
   {
     "type": "error",
+    "name": "ENSNameTooLong",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "PolicyPaused",
     "inputs": []
   },
