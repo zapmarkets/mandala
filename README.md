@@ -199,11 +199,10 @@ npx tsx scripts/demo.ts
 
 | Contract             | Address |
 |----------------------|---------|
-| MandalaPolicy        | TBD     |
-| MandalaAgentRegistry | TBD     |
-| MandalaTask (impl)   | TBD     |
-| MandalaFactory       | TBD     |
-| MandalaAllowanceEnforcer | TBD |
+| MandalaPolicy        | [0x71D93d5512008666e64eD4dBC0FDAd6660018014](https://sepolia.basescan.org/address/0x71D93d5512008666e64eD4dBC0FDAd6660018014) |
+| MandalaAgentRegistry | [0x79BADa1Ef5E2C760ace317b4f3F1aD44597bF268](https://sepolia.basescan.org/address/0x79BADa1Ef5E2C760ace317b4f3F1aD44597bF268) |
+| MandalaTask (impl)   | [0xcAdCD7dA68539701EfBB59Ae66613a8B10023477](https://sepolia.basescan.org/address/0xcAdCD7dA68539701EfBB59Ae66613a8B10023477) |
+| MandalaFactory       | [0x80A9e6F5Cc844FCb617e55aFB391c9B0b9638f37](https://sepolia.basescan.org/address/0x80A9e6F5Cc844FCb617e55aFB391c9B0b9638f37) |
 
 ---
 
